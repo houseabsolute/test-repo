@@ -79,10 +79,10 @@ jobs:
           #   os: windows-latest
           #   target: i686-pc-windows-msvc
           #   skip_tests: true
-          # - os_name: Windows-x86_64
-          #   os: windows-latest
-          #   target: x86_64-pc-windows-msvc
-          #   skip_tests: true
+          - os_name: Windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            skip_tests: true
           # - os_name: macOS-x86_64
           #   os: macOS-latest
           #   target: x86_64-apple-darwin
@@ -133,6 +133,7 @@ jobs:
           DIR=target/${{ matrix.platform.target }}/release
           mkdir -p "$DIR"
           echo "binary" > "$DIR"/ubi
+          echo "binary" > "$DIR"/ubi.exe
       # - name: Build binary
       #   uses: houseabsolute/actions-rust-cross@v0
       #   with:
