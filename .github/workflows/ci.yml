@@ -1,0 +1,158 @@
+name: Tests and release
+on: [push, pull_request]
+env:
+  CRATE_NAME: ubi
+  GITHUB_TOKEN: ${{ github.token }}
+  RUST_BACKTRACE: 1
+jobs:
+  test:
+    name: ${{ matrix.platform.os_name }} with rust ${{ matrix.toolchain }}
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          # Platforms that don't work:
+          #
+          # - sparc64-unknown-linux-gnu - cannot compile openssl-sys
+          # - x86_64-unknown-illumos - weird error compiling openssl - "bin/sh: 1: granlib: not found"
+
+          # - os_name: FreeBSD-x86_64
+          #   os: ubuntu-20.04
+          #   target: x86_64-unknown-freebsd
+          #   skip_tests: true
+          # - os_name: Linux-x86_64
+          #   os: ubuntu-20.04
+          #   target: x86_64-unknown-linux-musl
+          # - os_name: Linux-x86_64 (rustls-native-roots)
+          #   os: ubuntu-20.04
+          #   target: x86_64-unknown-linux-musl
+          #   features: rustls-tls-native-roots
+          # - os_name: Linux-x86_64 (native-tls)
+          #   os: ubuntu-20.04
+          #   # We need to use gnu or we cannot link against openssl.
+          #   target: x86_64-unknown-linux-gnu
+          #   features: native-tls
+          # - os_name: Linux-x86_64 (native-tls-vendored)
+          #   os: ubuntu-20.04
+          #   target: x86_64-unknown-linux-musl
+          #   features: native-tls-vendored
+          # - os_name: Linux-aarch64
+          #   os: ubuntu-20.04
+          #   target: aarch64-unknown-linux-musl
+          # - os_name: Linux-arm
+          #   os: ubuntu-20.04
+          #   target: arm-unknown-linux-musleabi
+          # - os_name: Linux-i686
+          #   os: ubuntu-20.04
+          #   target: i686-unknown-linux-musl
+          #   skip_tests: true
+          # - os_name: Linux-powerpc
+          #   os: ubuntu-20.04
+          #   target: powerpc-unknown-linux-gnu
+          #   skip_tests: true
+          # - os_name: Linux-powerpc64
+          #   os: ubuntu-20.04
+          #   target: powerpc64-unknown-linux-gnu
+          #   skip_tests: true
+          # - os_name: Linux-powerpc64le
+          #   os: ubuntu-20.04
+          #   target: powerpc64le-unknown-linux-gnu
+          #   skip_tests: true
+          # - os_name: Linux-riscv64
+          #   os: ubuntu-20.04
+          #   target: riscv64gc-unknown-linux-gnu
+          # - os_name: Linux-s390x
+          #   os: ubuntu-20.04
+          #   target: s390x-unknown-linux-gnu
+          #   skip_tests: true
+          # - os_name: NetBSD-x86_64
+          #   os: ubuntu-20.04
+          #   target: x86_64-unknown-netbsd
+          #   skip_tests: true
+          # - os_name: Windows-aarch64
+          #   os: windows-latest
+          #   target: aarch64-pc-windows-msvc
+          #   skip_tests: true
+          # - os_name: Windows-i686
+          #   os: windows-latest
+          #   target: i686-pc-windows-msvc
+          #   skip_tests: true
+          - os_name: Windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            skip_tests: true
+          # - os_name: macOS-x86_64
+          #   os: macOS-latest
+          #   target: x86_64-apple-darwin
+          # - os_name: macOS-aarch64
+          #   os: macOS-latest
+          #   target: aarch64-apple-darwin
+        toolchain:
+          - stable
+        # include:
+        #   - platform:
+        #       os_name: Linux-x86_64
+        #       os: ubuntu-20.04
+        #       target: x86_64-unknown-linux-musl
+        #       bin: ubi
+        #     toolchain: beta
+        #   - platform:
+        #       os_name: Linux-x86_64
+        #       os: ubuntu-20.04
+        #       target: x86_64-unknown-linux-musl
+        #       bin: ubi
+        #     toolchain: nightly
+    steps:
+      - uses: actions/checkout@v4
+      # - name: Cache cargo & target directories
+      #   uses: Swatinem/rust-cache@v2
+      #   with:
+      #     key: "v2"
+      # - name: Configure Git
+      #   run: |
+      #     git config --global user.email "jdoe@example.com"
+      #     git config --global user.name "J. Doe"
+      # - name: Set "--features" flag value
+      #   id: set-features-flag-value
+      #   shell: bash
+      #   run: |
+      #     if [ -n "${{ matrix.platform.features }}" ]; then
+      #         echo "features=${{ matrix.platform.features }}" >> "$GITHUB_OUTPUT"
+      #     else 
+      #         echo "features=default" >> "$GITHUB_OUTPUT"
+      #     fi
+      #     cat "$GITHUB_OUTPUT"
+      # - name: Maybe install SSL packages
+      #   run: sudo apt-get update --yes && sudo apt-get install --yes pkg-config openssl libssl-dev
+      #   if: matrix.platform.features == 'native-tls'
+      - name: Build binary
+        shell: bash
+        run: |
+          DIR=target/${{ matrix.platform.target }}/release
+          mkdir -p "$DIR"
+          echo "binary" > "$DIR"/ubi.exe
+      # - name: Build binary
+      #   uses: houseabsolute/actions-rust-cross@v0
+      #   with:
+      #     command: "build"
+      #     target: ${{ matrix.platform.target }}
+      #     toolchain: ${{ matrix.toolchain }}
+      #     args:
+      #       "--locked --release --features ${{ steps.set-features-flag-value.outputs.features }}"
+      #     strip: true
+      - name: Run tests
+        uses: houseabsolute/actions-rust-cross@v0
+        with:
+          command: "test"
+          target: ${{ matrix.platform.target }}
+          toolchain: ${{ matrix.toolchain }}
+          args:
+            "--locked --release  --features ${{ steps.set-features-flag-value.outputs.features }}"
+        if: ${{ !matrix.platform.skip_tests }}
+      - name: Publish artifacts and release
+        uses: houseabsolute/actions-rust-release@v0
+        with:
+          binary-name: ubi
+          target: ${{ matrix.platform.target }}
+        if: matrix.toolchain == 'stable' && matrix.platform.features == ''
